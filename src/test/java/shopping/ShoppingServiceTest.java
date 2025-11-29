@@ -33,7 +33,8 @@ class ShoppingServiceTest {
     /**
      * Тестируем получение корзины пользователя.
      * <p>Логические ошибки:</p>
-     * <li>Класс Cart не должен зависеть от пользователя</li>
+     * <li>Класс {@link Cart} не должен зависеть от пользователя. Customer в классе
+     * Cart вообще не используется</li>
      * <li>ShoppingServiceImpl.getCart() возвращает новую корзину</li>
      */
     @Test
@@ -43,10 +44,10 @@ class ShoppingServiceTest {
         cart.add(apple, 1);
 
         Cart realCart = shoppingService.getCart(customer);
-        Assertions.assertNotNull(cart);
+        Assertions.assertNotNull(realCart);
         Map<Product, Integer> productsInCart = realCart.getProducts();
-        Assertions.assertEquals(1, productsInCart.size());
-        Assertions.assertTrue(productsInCart.containsKey(apple));
+
+        Assertions.assertEquals(cart.getProducts(), productsInCart);
     }
 
     /**
@@ -69,41 +70,56 @@ class ShoppingServiceTest {
 
     /**
      * Тестируем покупку корзины. Проверки:
-     * <li>Можно купить, когда хватает товара</li>
+     * <li>Можно купить, когда хватает товара. Корзина очищается</li>
      * <li>Нельзя купить, когда товара недостаточно</li>
+     *
+     * <p>Ошибка: корзина не очищается при покупке</p>
      */
     @Test
-    void buy() {
+    void buy() throws BuyException {
         Cart cart = new Cart(customer);
+        Cart cart2 = new Cart(new Customer(140L, "111"));
         Product product = new Product("Апельсин", 3);
         cart.add(product, 2);
-        boolean isSuccessful = Assertions.assertDoesNotThrow(() ->
-                shoppingService.buy(cart)
-        );
-        Assertions.assertTrue(isSuccessful);
+        cart2.add(product, 2);
+
+        Assertions.assertTrue(shoppingService.buy(cart));
         Assertions.assertEquals(1, product.getCount());
         Mockito.verify(productDaoMock, Mockito.times(1)).save(product);
+        Assertions.assertTrue(cart.getProducts().isEmpty());
 
         BuyException exception = Assertions.assertThrows(BuyException.class, () ->
-                shoppingService.buy(cart)
+                shoppingService.buy(cart2)
         );
         Assertions.assertEquals("В наличии нет необходимого количества товара 'Апельсин'",
                 exception.getMessage());
+        Assertions.assertFalse(cart2.getProducts().isEmpty());
         Mockito.verify(productDaoMock, Mockito.times(1)).save(product);
+    }
+
+    /**
+     * Тестирует покупку корзины с отрицательным количеством товара.
+     * Не пройдёт: в данный момент ShoppingService позволяет выполнить такую операцию.
+     * При этом даже увеличит кол-во товара.
+     */
+    @Test
+    void buyNegativeAmountOfProduct() {
+        Cart cart = new Cart(customer);
+        Product product = new Product("Апельсин", 3);
+        cart.add(product, -3);
+        Assertions.assertThrows(BuyException.class, () -> shoppingService.buy(cart));
+        Mockito.verify(productDaoMock, Mockito.never()).save(product);
+        Assertions.assertEquals(3, product.getCount());
     }
 
     /**
      * Тестируем покупку пустой корзины
      */
     @Test
-    void buyEmptyCart() {
+    void buyEmptyCart() throws BuyException {
         Cart cart = new Cart(customer);
-
-        boolean isSuccessful = Assertions.assertDoesNotThrow(() ->
-                shoppingService.buy(cart)
-        );
+        Assertions.assertFalse(shoppingService.buy(cart));
         Mockito.verify(productDaoMock, Mockito.never())
                 .save(Mockito.any(Product.class));
-        Assertions.assertFalse(isSuccessful);
     }
 }

@@ -12,62 +12,86 @@ import java.util.Map;
  * Тестирует класс {@link Cart}
  */
 class CartTest {
-    private Cart cart1;
-    private Cart cart2;
+    private Cart cart;
 
     /**
      * Пересоздаём корзины перед каждым тестом
      */
     @BeforeEach
     void setupCarts() {
-        cart1 = new Cart(new Customer(123L, "123"));
-        cart2 = new Cart(new Customer(456L, "789"));
+        cart = new Cart(new Customer(123L, "123"));
     }
 
     /**
-     * Тестирует добавление товаров в корзину. Проверки:
-     * <li>Добавление товара, когда его хватает</li>
-     * <li>Добавление товара, когда его не хватает</li>
-     * <p>Вторая проверка не пройдёт - количество товара не уменьшается после того, как
-     * покупатель забрал его часть в корзину (логическая ошибка) в validateCount()</p>
+     * Тестирует добавление товаров в корзину, когда его хватает.
+     * <p>Тест не пройдёт: так как в {@link Cart#validateCount(Product, int)} не
+     * позволяет оставить кол-во товара равным 0 (всегда минимум 1)</p>
      */
     @Test
-    void add() {
+    void addWhenEnoughProducts() {
         Product grape = new Product("Виноград", 5);
 
-        Assertions.assertDoesNotThrow(() -> cart1.add(grape, 3));
-        Map<Product, Integer> products = cart1.getProducts();
+        cart.add(grape, 5);
+        Map<Product, Integer> products = cart.getProducts();
         Assertions.assertEquals(1, products.size());
         Assertions.assertTrue(products.containsKey(grape));
-
-        IllegalArgumentException exp =
-                Assertions.assertThrows(IllegalArgumentException.class,
-                        () -> cart2.add(grape, 3));
-        Assertions.assertEquals("Невозможно добавить товар 'Виноград' в корзину, т.к. "
-                + "нет необходимого количества товаров", exp.getMessage());
-        Assertions.assertTrue(cart2.getProducts().isEmpty());
     }
 
     /**
-     * Тестирует изменение количества товаров в корзине. Проверки:
-     * <li>Изменение количества товара, когда его хватает</li>
-     * <li>Изменение количества товара, когда его не хватает</li>
-     * <p>Вторая проверка не пройдёт - количество товара не уменьшается после того, как
-     * покупатель забрал его часть в корзину (логическая ошибка) в validateCount()</p>
+     * Тестирует добавление товаров в корзину, когда его недостаточно
      */
     @Test
-    void edit() {
-        Product tomato = new Product("Помидор", 8);
-        cart1.add(tomato, 4);
-        cart2.add(tomato, 2);
-        cart2.edit(tomato, 4);
-        Assertions.assertEquals(4, cart2.getProducts().get(tomato));
+    void addWhenNotEnoughProducts() {
+        Product grape = new Product("Виноград", 5);
 
         IllegalArgumentException exp =
                 Assertions.assertThrows(IllegalArgumentException.class,
-                        () -> cart2.edit(tomato, 5));
+                        () -> cart.add(grape, 6));
+        Assertions.assertEquals("Невозможно добавить товар 'Виноград' в корзину, т.к. "
+                + "нет необходимого количества товаров", exp.getMessage());
+        Assertions.assertTrue(cart.getProducts().isEmpty());
+    }
+
+    /**
+     * Тестирует добавление отрицательного кол-ва продукта в корзину
+     * <p>Упадёт из-за логической ошибки: cart не проверяет кол-во товаров на
+     * отрицательность. Также доп. ошибка: в целом можно создать {@link Product} с
+     * отрицательным значением кол-во товара</p>
+     */
+    @Test
+    void addNegativeAmountOfProduct() {
+        Product grape = new Product("Виноград", 5);
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> cart.add(grape, -1));
+    }
+
+    /**
+     * Тестирует изменение количества товаров в корзине, когда его хватает</li>
+     */
+    @Test
+    void editWhenEnoughProducts() {
+        Product tomato = new Product("Помидор", 8);
+        cart.add(tomato, 4);
+        cart.edit(tomato, 7);
+        Assertions.assertEquals(7, cart.getProducts().get(tomato));
+    }
+
+    /**
+     * Тестирует изменение количества товаров в корзине, когда его недостаточно</li>
+     */
+    @Test
+    void editWhenNotEnoughProducts() {
+        Product tomato = new Product("Помидор", 8);
+        cart.add(tomato, 4);
+
+        IllegalArgumentException exp =
+                Assertions.assertThrows(IllegalArgumentException.class,
+                        () -> cart.edit(tomato, 9));
         Assertions.assertEquals("Невозможно добавить товар 'Помидор' в корзину, т.к. "
                 + "нет необходимого количества товаров", exp.getMessage());
-        Assertions.assertEquals(4, cart2.getProducts().get(tomato));
+        Assertions.assertEquals(4, cart.getProducts().get(tomato));
     }
+
+
+//    void testBuyNegativeAmountProduct();
 }
